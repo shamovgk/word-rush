@@ -1,8 +1,9 @@
 import { Container, Text } from '@/components/ui';
 import { BORDER_RADIUS, COLORS, SPACING } from '@/constants/design-system';
+import { useAuth } from '@/contexts/AuthContext';
 import { resetProgress } from '@/lib/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Stack, useRouter } from 'expo-router';
+import { Link, Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ const SETTINGS_SOUND_KEY = 'settings:sound';
 const SETTINGS_HAPTICS_KEY = 'settings:haptics';
 
 export default function SettingsScreen() {
+  const { currentUser } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [sound, setSound] = useState(true);
@@ -93,6 +95,31 @@ export default function SettingsScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
+          <View style={{ marginTop: SPACING.sm }}>
+          <Link href="/auth/accounts" asChild>
+            <Pressable
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: SPACING.md,
+                padding: SPACING.lg,
+                borderRadius: BORDER_RADIUS.lg,
+                backgroundColor: COLORS.primary,
+              }}
+            >
+              <Text style={{ fontSize: 40 }}>{currentUser?.avatar || '😀'}</Text>
+              <View style={{ flex: 1 }}>
+                <Text variant="body" weight="semibold" style={{ color: '#fff' }}>
+                  {currentUser?.displayName || 'Гость'}
+                </Text>
+                <Text variant="caption" style={{ color: '#E3F2FD' }}>
+                  @{currentUser?.username || 'guest'} • Управление аккаунтами
+                </Text>
+              </View>
+              <Text style={{ fontSize: 20, color: '#fff' }}>→</Text>
+            </Pressable>
+          </Link>
+        </View>
           {/* Заголовок */}
           <View style={{ marginTop: SPACING.sm }}>
             <Text variant="title" weight="bold" align="center">

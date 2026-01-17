@@ -1,5 +1,6 @@
 /**
- * Модуль для работы с прогрессом пользователя (с константами)
+ * Хранение прогресса с поддержкой множественных пользователей
+ * Каждый пользователь имеет изолированные данные
  */
 
 import {
@@ -9,7 +10,6 @@ import {
   MAX_RECENT_MISTAKES,
   MAX_SESSIONS_HISTORY,
   MISTAKES_RETENTION_DAYS,
-  STORAGE_KEYS
 } from '@/utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
@@ -21,37 +21,108 @@ import type {
   RunSummary,
 } from '../types';
 
-const PROGRESS_KEY = STORAGE_KEYS.PROGRESS;
+// ============ УПРАВЛЕНИЕ ТЕКУЩИМ ПОЛЬЗОВАТЕЛЕМ ============
+
+let currentUserId: string | null = null;
 
 /**
- * Загружает состояние прогресса
+ * Устанавливает ID текущего пользователя
+ * Должна вызываться после успешного логина
+ */
+export function setCurrentUserId(userId: string) {
+  currentUserId = userId;
+  console.log(`✅ Storage: установлен userId = ${userId}`);
+}
+
+/**
+ * Очищает ID текущего пользователя
+ * Должна вызываться при выходе
+ */
+export function clearCurrentUserId() {
+  currentUserId = null;
+  console.log('🔒 Storage: userId очищен');
+}
+
+/**
+ * Получает ключ хранилища с префиксом пользователя
+ */
+function getUserKey(key: string): string | null {
+  if (!currentUserId) {
+    console.warn('⚠️ Storage: попытка доступа без userId');
+    return null;
+  }
+  return `user:${currentUserId}:${key}`;
+}
+
+// ============ ФУНКЦИИ РАБОТЫ С ПРОГРЕССОМ ============
+
+const PROGRESS_KEY = 'progress:v1';
+
+/**
+ * Загружает прогресс текущего пользователя
  */
 export async function loadProgress(): Promise<ProgressState> {
   try {
-    const raw = await AsyncStorage.getItem(PROGRESS_KEY);
-    if (!raw) return { packs: {} };
+    const key = getUserKey(PROGRESS_KEY);
+    
+    // Если нет userId, возвращаем пустой прогресс
+    if (!key) {
+      return { packs: {} };
+    }
+    
+    const raw = await AsyncStorage.getItem(key);
+    
+    if (!raw) {
+      return { packs: {} };
+    }
+    
     return JSON.parse(raw) as ProgressState;
-  } catch {
+  } catch (e) {
+    console.error('Ошибка загрузки прогресса:', e);
     return { packs: {} };
   }
 }
 
 /**
- * Сохраняет состояние прогресса
+ * Сохраняет прогресс текущего пользователя
  */
 export async function saveProgress(state: ProgressState): Promise<void> {
-  await AsyncStorage.setItem(PROGRESS_KEY, JSON.stringify(state));
+  try {
+    const key = getUserKey(PROGRESS_KEY);
+    
+    // Если нет userId, не сохраняем
+    if (!key) {
+      console.warn('⚠️ Storage: попытка сохранения без userId');
+      return;
+    }
+    
+    await AsyncStorage.setItem(key, JSON.stringify(state));
+  } catch (e) {
+    console.error('Ошибка сохранения прогресса:', e);
+  }
 }
 
 /**
- * Сбрасывает весь прогресс
+ * Сбрасывает прогресс текущего пользователя
  */
 export async function resetProgress(): Promise<void> {
-  await AsyncStorage.removeItem(PROGRESS_KEY);
+  try {
+    const key = getUserKey(PROGRESS_KEY);
+    
+    if (!key) {
+      console.warn('⚠️ Storage: попытка сброса без userId');
+      return;
+    }
+    
+    await AsyncStorage.removeItem(key);
+    console.log('🗑️ Прогресс сброшен');
+  } catch (e) {
+    console.error('Ошибка сброса прогресса:', e);
+  }
 }
 
 /**
- * Обновляет прогресс слова с учётом сложности уровня
+ * Обновляет прогресс изучения слова
  */
 export async function updateLexemeProgress(
   packId: string,
@@ -60,15 +131,17 @@ export async function updateLexemeProgress(
   levelDifficulty: 'easy' | 'normal' | 'hard'
 ): Promise<void> {
   const state = await loadProgress();
-  if (!state.packs[packId]) state.packs[packId] = {};
 
-  const current = state.packs[packId][lexemeId] ?? {
+  if (!state.packs[packId]) {
+    state.packs[packId] = {};
+  }
+
+  const current: LexemeProgress = state.packs[packId][lexemeId] ?? {
     mastery: 0,
     recentMistakes: [],
   };
 
   const multiplier = MASTERY_MULTIPLIERS[levelDifficulty] ?? MASTERY_MULTIPLIERS.normal;
-
   let newMastery = current.mastery;
 
   if (wasCorrect) {
@@ -77,55 +150,44 @@ export async function updateLexemeProgress(
     newMastery = Math.max(0, current.mastery - MASTERY_DECREASE_ON_ERROR);
   }
 
-  let mistakes = [...current.recentMistakes];
-  if (!wasCorrect) {
-    mistakes.push(new Date().toISOString());
-    mistakes = mistakes.slice(-MAX_RECENT_MISTAKES);
-  } else {
-    mistakes = mistakes.filter((m) => {
-      const errorDate = new Date(m);
-      const now = new Date();
-      const daysDiff = (now.getTime() - errorDate.getTime()) / (1000 * 60 * 60 * 24);
-      return daysDiff < MISTAKES_RETENTION_DAYS;
-    });
-  }
+  const newMistakes = wasCorrect
+    ? current.recentMistakes
+    : [...current.recentMistakes, new Date().toISOString()].slice(-MAX_RECENT_MISTAKES);
+
+  const retentionDate = new Date();
+  retentionDate.setDate(retentionDate.getDate() - MISTAKES_RETENTION_DAYS);
+  const retentionTimestamp = retentionDate.toISOString();
+
+  const filteredMistakes = newMistakes.filter((d) => d >= retentionTimestamp);
 
   state.packs[packId][lexemeId] = {
-    mastery: Math.round(newMastery * 10) / 10,
-    recentMistakes: mistakes,
+    mastery: newMastery,
+    recentMistakes: filteredMistakes,
   };
 
   await saveProgress(state);
 }
 
 /**
- * Получает прогресс конкретного слова
- */
-export async function getLexemeProgress(packId: string, lexemeId: string): Promise<LexemeProgress> {
-  const state = await loadProgress();
-  return (
-    state.packs[packId]?.[lexemeId] ?? {
-      mastery: 0,
-      recentMistakes: [],
-    }
-  );
-}
-
-/**
- * Обновляет прогресс уровня после завершения
+ * Обновляет прогресс уровня
  */
 export async function updateLevelProgress(
   packId: string,
   levelId: string,
   score: number,
   accuracy: number,
-  stars: number 
+  stars: number
 ): Promise<void> {
   const st = await loadProgress();
-  if (!st.levelProgress) st.levelProgress = {};
-  if (!st.levelProgress[packId]) st.levelProgress[packId] = {};
 
-  const current = st.levelProgress[packId][levelId] ?? {
+  if (!st.levelProgress) {
+    st.levelProgress = {};
+  }
+  if (!st.levelProgress[packId]) {
+    st.levelProgress[packId] = {};
+  }
+
+  const current: LevelProgress = st.levelProgress[packId][levelId] ?? {
     levelId,
     stars: 0,
     bestScore: 0,
@@ -134,15 +196,12 @@ export async function updateLevelProgress(
     attempts: 0,
   };
 
-  // Валидация stars
-  const validStars = (stars === 0 || stars === 1 || stars === 2 || stars === 3) ? stars : 0;
-
   const updatedProgress: LevelProgress = {
-    levelId,
-    stars: Math.max(current.stars, validStars) as 0 | 1 | 2 | 3,
+    ...current,
+    stars: Math.max(current.stars, stars) as 0 | 1 | 2 | 3,
     bestScore: Math.max(current.bestScore, score),
     bestAccuracy: Math.max(current.bestAccuracy, accuracy),
-    completed: validStars === 3 || current.completed,
+    completed: current.completed || stars > 0,
     attempts: current.attempts + 1,
     lastPlayedAt: new Date().toISOString(),
   };
@@ -152,9 +211,12 @@ export async function updateLevelProgress(
 }
 
 /**
- * Получает прогресс конкретного уровня
+ * Получает прогресс уровня
  */
-export async function getLevelProgress(packId: string, levelId: string): Promise<LevelProgress> {
+export async function getLevelProgress(
+  packId: string,
+  levelId: string
+): Promise<LevelProgress> {
   const st = await loadProgress();
   return (
     st.levelProgress?.[packId]?.[levelId] ?? {
@@ -169,35 +231,42 @@ export async function getLevelProgress(packId: string, levelId: string): Promise
 }
 
 /**
- * Проверяет, разблокирован ли уровень
+ * Проверяет, открыт ли уровень
  */
 export function isLevelUnlocked(
   pack: Pack,
   level: PackLevel,
   progressMap: Record<string, LevelProgress>
 ): boolean {
-  if (!level.unlockRequirement.previousLevel) return true;
+  if (!level.unlockRequirement.previousLevel) {
+    return true;
+  }
 
   const prevProgress = progressMap[level.unlockRequirement.previousLevel];
-  if (!prevProgress) return false;
+  if (!prevProgress) {
+    return false;
+  }
 
   return prevProgress.stars >= level.unlockRequirement.minStars;
 }
 
 /**
- * Применяет результаты игровой сессии к прогрессу
+ * Применяет результаты игровой сессии
  */
-export async function applySessionSummary(pack: Pack, summary: RunSummary): Promise<void> {
+export async function applySessionSummary(
+  pack: Pack,
+  summary: RunSummary
+): Promise<void> {
   const levelDifficulty = summary.distractorMode ?? 'normal';
   const errorSet = new Set(summary.errors.map((e) => e.lexemeId));
 
   if (summary.answers && summary.answers.length > 0) {
     const lexemeResults = new Map<string, boolean>();
-    
+
     for (const answer of summary.answers) {
       const wasCorrect = !errorSet.has(answer.lexemeId);
-      
       const existingResult = lexemeResults.get(answer.lexemeId);
+
       if (existingResult === undefined || (wasCorrect && !existingResult)) {
         lexemeResults.set(answer.lexemeId, wasCorrect);
       }
@@ -208,24 +277,26 @@ export async function applySessionSummary(pack: Pack, summary: RunSummary): Prom
     }
   }
 
-  // Передаём stars из summary
-  await updateLevelProgress(pack.id, summary.levelId, summary.score, summary.accuracy, summary.stars);
+  const { stars } = summary;
+  await updateLevelProgress(
+    pack.id,
+    summary.levelId,
+    summary.score,
+    summary.accuracy,
+    summary.stars
+  );
 
   const state = await loadProgress();
-  if (!state.sessions) state.sessions = [];
-  state.sessions.push({
-    ...summary,
-    timestamp: new Date().toISOString(),
-  } as any);
-
+  if (!state.sessions) {
+    state.sessions = [];
+  }
+  state.sessions.push({ ...summary, timestamp: new Date().toISOString() } as any);
   state.sessions = state.sessions.slice(-MAX_SESSIONS_HISTORY);
-
   await saveProgress(state);
 }
 
-
 /**
- * Получает сводку по прогрессу пака
+ * Получает сводку прогресса по паку
  */
 export async function getPackProgressSummary(pack: Pack): Promise<{
   mastered: number;
@@ -239,14 +310,18 @@ export async function getPackProgressSummary(pack: Pack): Promise<{
   let mastered = 0;
   for (const lex of pack.lexemes) {
     const p = packProgress[lex.id];
-    if (p && p.mastery >= 4) mastered++;
+    if (p && p.mastery >= 4) {
+      mastered++;
+    }
   }
 
   let completedLevels = 0;
   const levelProgressMap = state.levelProgress?.[pack.id] ?? {};
   for (const level of pack.levels) {
     const lp = levelProgressMap[level.id];
-    if (lp && lp.completed) completedLevels++;
+    if (lp && lp.completed) {
+      completedLevels++;
+    }
   }
 
   return {
@@ -258,9 +333,11 @@ export async function getPackProgressSummary(pack: Pack): Promise<{
 }
 
 /**
- * Получает список слов пака с их прогрессом
+ * Получает список слов пака с прогрессом
  */
-export async function getPackLexemesWithProgress(pack: Pack): Promise<
+export async function getPackLexemesWithProgress(
+  pack: Pack
+): Promise<
   Array<{
     id: string;
     base: string;

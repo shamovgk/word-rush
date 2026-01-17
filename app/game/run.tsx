@@ -86,7 +86,7 @@ export default function RunScreen() {
   }, [pack.levels, levelId]);
 
   const gameState = useGameState(effectiveLevel.lives ?? 3);
-  const { playCorrectSound, playIncorrectSound } = useSoundEffects();
+  const { playCorrectSound, playIncorrectSound, playVictorySound, playDefeatSound } = useSoundEffects();
 
   const [isPaused, setPaused] = useState(false);
   const [highlight, setHighlight] = useState<HighlightState | null>(null);
@@ -179,6 +179,14 @@ export default function RunScreen() {
               accuracy >= STARS_THRESHOLDS.ONE ? 1 : 0;
       console.log(`⭐ Режим "на время": ${Math.round(accuracy * 100)}% точность → ${stars} звезд`);
     }
+
+    if (stars === 3) {
+    // 🎉 Идеальный результат (3 звезды)
+    playVictorySound();
+  } else if (stars === 0) {
+    // 💔 Поражение (0 звёзд)
+    playDefeatSound();
+  }
 
     console.log('📊 Финальная статистика:', {
       gameMode,

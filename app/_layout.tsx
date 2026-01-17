@@ -1,79 +1,110 @@
-import { Stack } from 'expo-router';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
-export default function RootLayout() {
+function RootLayoutNav() {
+  const { currentUser, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const isInAuthGroup = segments[0] === 'auth';
+    const isOnLoginScreen = isInAuthGroup && segments[1] === 'login';
+
+    if (!currentUser && !isOnLoginScreen) {
+      router.replace('/auth/login');
+      return;
+    }
+
+  }, [currentUser, segments, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#2196F3" />
+      </View>
+    );
+  }
+
   return (
     <Stack
       screenOptions={{
         headerShown: true,
-        headerStyle: {
-          backgroundColor: '#fff',
-        },
+        headerStyle: { backgroundColor: '#fff' },
         headerTintColor: '#000',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerTitleStyle: { fontWeight: 'bold' },
         headerShadowVisible: true,
       }}
     >
-      {/* Главная - без header */}
-      <Stack.Screen 
-        name="index" 
-        options={{ 
-          headerShown: false,
-        }} 
+      {/* Auth-экраны */}
+      <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="auth/accounts"
+        options={{
+          title: 'Аккаунты',
+          headerStyle: { backgroundColor: '#2196F3' },
+          headerTintColor: '#fff',
+          headerBackTitle: 'Назад',
+        }}
       />
-      
-      {/* Настройки - модальное окно */}
-      <Stack.Screen 
-        name="settings" 
-        options={{ 
+
+      {/* Главная */}
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+
+      {/* Остальные экраны – как у тебя было */}
+      <Stack.Screen
+        name="settings"
+        options={{
           title: 'Настройки',
           presentation: 'modal',
           headerBackTitle: 'Закрыть',
-        }} 
+        }}
       />
-      
-      {/* Пак с уровнями */}
-      <Stack.Screen 
-        name="pack/[packId]" 
-        options={{ 
+      <Stack.Screen
+        name="pack/[packId]"
+        options={{
           title: 'Уровни',
           headerBackTitle: 'Главная',
           animation: 'slide_from_right',
-        }} 
+        }}
       />
-      
-      {/* Словарь */}
-      <Stack.Screen 
-        name="dictionary" 
-        options={{ 
+      <Stack.Screen
+        name="dictionary"
+        options={{
           title: 'Словарь',
           headerBackTitle: 'Назад',
           animation: 'slide_from_right',
-        }} 
+        }}
       />
-      
-      {/* Игра - без header, без жестов */}
-      <Stack.Screen 
-        name="game/run" 
-        options={{ 
+      <Stack.Screen
+        name="game/run"
+        options={{
           headerShown: false,
           gestureEnabled: false,
           animation: 'fade',
-        }} 
+        }}
       />
-      
-      {/* Результаты - без кнопки назад, без жестов */}
-      <Stack.Screen 
-        name="result" 
-        options={{ 
+      <Stack.Screen
+        name="result"
+        options={{
           title: 'Результаты',
           headerBackVisible: false,
           gestureEnabled: false,
           headerLeft: () => null,
           animation: 'slide_from_bottom',
-        }} 
+        }}
       />
     </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   );
 }

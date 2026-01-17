@@ -1,19 +1,23 @@
 import { Text } from '@/components/ui';
 import { BORDER_RADIUS, COLORS, SPACING } from '@/constants/design-system';
+import { useAuth } from '@/contexts/AuthContext';
 import { packsMeta } from '@/data/packs';
 import { getPackById } from '@/lib/content';
 import { getPackProgressSummary } from '@/lib/storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link, Stack } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, Image as RNImage, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function HomeScreen() {
+  const { currentUser } = useAuth();
   const [progress, setProgress] = useState<Record<string, any>>({});
   const insets = useSafeAreaInsets();
 
   const loadProgress = useCallback(async () => {
+    if (!currentUser) return;
+
     const progressData: Record<string, any> = {};
     for (const meta of packsMeta) {
       const pack = getPackById(meta.id);
@@ -23,7 +27,7 @@ export default function HomeScreen() {
       }
     }
     setProgress(progressData);
-  }, []);
+  }, [currentUser]);
 
   useFocusEffect(
     useCallback(() => {
@@ -33,14 +37,10 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
 
       <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.white }} edges={['top']}>
-        {/* Кастомный header */}
+        {/* Шапка */}
         <View
           style={{
             flexDirection: 'row',
@@ -51,20 +51,34 @@ export default function HomeScreen() {
             backgroundColor: COLORS.primary,
           }}
         >
-          <View style={{ flex: 1 }} />
-          <Text variant="title" color="white" weight="bold">
-            Word Rush
-          </Text>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <Link href="/settings" asChild>
-              <Pressable style={{ padding: 8 }}>
-                <Text style={{ fontSize: 24 }}>⚙️</Text>
-              </Pressable>
-            </Link>
+          {/* Аватар */}
+          <Link href="/auth/accounts" asChild>
+            <Pressable style={{ padding: 4 }}>
+              <Text style={{ fontSize: 28 }}>{currentUser?.avatar || '😀'}</Text>
+            </Pressable>
+          </Link>
+
+          {/* Логотип + Название */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <RNImage
+              source={require('@/assets/images/logo.png')}
+              style={{ width: 32, height: 32 }}
+              resizeMode="contain"
+            />
+            <Text variant="title" color="white" weight="bold">
+              Word Rush
+            </Text>
           </View>
+
+          {/* Настройки */}
+          <Link href="/settings" asChild>
+            <Pressable style={{ padding: 8 }}>
+              <Text style={{ fontSize: 24 }}>⚙️</Text>
+            </Pressable>
+          </Link>
         </View>
 
-        {/* Контент */}
+        {/* Остальной код без изменений */}
         <View style={{ flex: 1, backgroundColor: COLORS.white }}>
           <FlatList
             data={packsMeta}
@@ -91,9 +105,10 @@ export default function HomeScreen() {
             }
             renderItem={({ item }) => {
               const packProgress = progress[item.id];
-              const progressPct = packProgress
-                ? Math.round((packProgress.mastered / packProgress.total) * 100)
-                : 0;
+              const progressPct =
+                packProgress && packProgress.total > 0
+                  ? Math.round((packProgress.mastered / packProgress.total) * 100)
+                  : 0;
 
               return (
                 <Link
