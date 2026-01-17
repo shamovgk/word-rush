@@ -20,6 +20,11 @@ export const progressApi = {
     return response.data;
   },
 
+  getPackProgress: async (packId: string) => {
+    const response = await apiClient.get(`/progress/pack/${packId}`);
+    return response.data;
+  },
+
   getLevelAttempts: async (levelId: string, page: number = 1, limit: number = 10) => {
     const response = await apiClient.get(`/progress/level/${levelId}`, {
       params: { page, limit },

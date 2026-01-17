@@ -241,6 +241,60 @@ export class ProgressService {
       this.logger.log(`Achievement unlocked: ${key} for user ${userId}`, 'ProgressService');
     }
   }
+  async getPackProgress(userId: string, packId: string) {
+  this.logger.log(`Fetching pack progress for user ${userId}, pack ${packId}`, 'ProgressService');
+
+  const pack = await this.prisma.pack.findUnique({
+    where: { id: packId },
+    include: {
+      levels: {
+        orderBy: { levelNumber: 'asc' },
+        include: {
+          levelProgress: {
+            where: { userId },
+          },
+        },
+      },
+    },
+  });
+
+  if (!pack) {
+    throw new NotFoundException('Pack not found');
+  }
+
+  const levels = pack.levels.map((level, index) => {
+    const progress = level.levelProgress[0];
+    const previousLevel = index > 0 ? pack.levels[index - 1] : null;
+    const previousProgress = previousLevel?.levelProgress[0];
+    
+    // Первый уровень всегда разблокирован, остальные только если предыдущий завершен
+    const isUnlocked = index === 0 || (previousProgress?.highestStars ?? 0) > 0;
+
+    return {
+      id: level.id,
+      levelNumber: level.levelNumber,
+      mode: level.mode,
+      difficulty: level.difficulty,
+      stars: progress?.highestStars ?? 0,
+      bestScore: progress?.bestScore ?? 0,
+      isCompleted: (progress?.highestStars ?? 0) > 0,
+      isUnlocked,
+      timesPlayed: progress?.timesPlayed ?? 0,
+    };
+  });
+
+  return {
+    packId: pack.id,
+    title: pack.title,
+    description: pack.description,
+    icon: pack.icon,
+    levels,
+    totalLevels: levels.length,
+    completedLevels: levels.filter(l => l.isCompleted).length,
+    totalStars: levels.reduce((sum, l) => sum + l.stars, 0),
+    maxStars: levels.length * 3,
+  };
+}
 
   async getPackDictionary(userId: string, packId: string) {
     this.logger.log(`Fetching dictionary for pack ${packId}, user ${userId}`, 'ProgressService');

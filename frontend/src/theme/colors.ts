@@ -1,8 +1,8 @@
 export const colors = {
   primary: {
-    main: '#2C4058',      // Navy Blue
-    light: '#3D5370',
-    dark: '#1F2D3F',
+    main: '#58CC02',      // Зеленый Duolingo (изменено с Navy Blue)
+    light: '#89E219',
+    dark: '#46A302',
   },
   accent: {
     main: '#FFC729',      // Golden Yellow
@@ -14,8 +14,13 @@ export const colors = {
     light: '#7BE004',
     dark: '#46A302',
   },
+  warning: {
+    main: '#FFC800',
+    light: '#FFD740',
+    dark: '#FFB300',
+  },
   error: {
-    main: '#FF4B4B',      // Red
+    main: '#FF4B4B',     // Red
     light: '#FF6B6B',
     dark: '#E53838',
   },
@@ -33,6 +38,7 @@ export const colors = {
     default: '#F7F7F7',
     paper: '#FFFFFF',
     dark: '#2C4058',
+    secondary: '#F0F0F0',
   },
   text: {
     primary: '#3C3C3C',
@@ -48,4 +54,20 @@ export const colors = {
     confident: '#2196F3',
     master: '#673AB7',
   },
+  // ДОБАВЛЕНО: Градиенты для мультяшного дизайна
+  gradient: {
+    green: ['#58CC02', '#89E219'] as const,
+    blue: ['#1CB0F6', '#4FC3F7'] as const,
+    purple: ['#CE82FF', '#B967FF'] as const,
+    orange: ['#FF9600', '#FFB800'] as const,
+    red: ['#FF4B4B', '#FF6B6B'] as const,
+  },
+  // ДОБАВЛЕНО: Дополнительные цвета
+  border: '#E5E5E5',
+  disabled: '#DEDEDE',
+  shadow: 'rgba(0, 0, 0, 0.1)',
+  heart: '#FF4B4B',
+  star: '#FFC800',
+  xp: '#FFA500',
+  streak: '#FF9600',
 };

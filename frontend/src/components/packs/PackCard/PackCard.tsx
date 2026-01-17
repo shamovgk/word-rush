@@ -32,11 +32,11 @@ export const PackCard: React.FC<PackCardProps> = ({
       activeOpacity={0.9}
     >
       <View style={styles.imageContainer}>
-        {/* {imageUrl ? (
+        {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.image} />
         ) : (
           <View style={styles.imagePlaceholder} />
-        )} */}
+        )}
         {isLocked && (
           <View style={styles.lockOverlay}>
             <Text style={styles.lockIcon}>🔒</Text>

@@ -121,7 +121,18 @@ export class ProgressController {
   ) {
     return this.progressService.getLevelAttempts(req.user.id, levelId, page, limit);
   }
-
+  @Get('pack/:packId')
+  @ApiOperation({ 
+    summary: 'Получить прогресс по паку',
+    description: 'Возвращает прогресс пользователя по всем уровням пака'
+  })
+  @ApiParam({ name: 'packId', description: 'ID пака', type: 'string' })
+  @ApiResponse({ status: 200, description: 'Прогресс по паку' })
+  @ApiResponse({ status: 401, description: 'Не авторизован' })
+  async getPackProgress(@Request() req, @Param('packId') packId: string) {
+    return this.progressService.getPackProgress(req.user.id, packId);
+  }
+  
   @Get('dictionary/pack/:packId')
   @ApiOperation({ 
     summary: 'Получить словарь пака',

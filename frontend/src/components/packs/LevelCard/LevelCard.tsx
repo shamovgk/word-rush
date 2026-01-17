@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, typography, spacing, borderRadius } from '@/theme';
+import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '@/theme';
 
 interface LevelCardProps {
   levelNumber: number;
@@ -8,8 +9,7 @@ interface LevelCardProps {
   maxStars: number;
   isLocked: boolean;
   isCompleted: boolean;
-  isCurrent: boolean;
-  mode: string;
+  mode: 'lives' | 'timed';
   onPress: () => void;
 }
 
@@ -19,124 +19,134 @@ export const LevelCard: React.FC<LevelCardProps> = ({
   maxStars,
   isLocked,
   isCompleted,
-  isCurrent,
   mode,
   onPress,
 }) => {
-  const getModeIcon = () => {
-    switch (mode) {
-      case 'LEARNING':
-        return '📚';
-      case 'SPEED':
-        return '⚡';
-      case 'CHALLENGE':
-        return '🏆';
-      default:
-        return '🎯';
-    }
+  const getGradientColors = (): readonly [string, string, ...string[]] => {
+    if (isLocked) return ['#E0E0E0', '#BDBDBD'];
+    if (isCompleted) return [...colors.gradient.green];
+    return [...colors.gradient.blue];
   };
 
-  const getStatusStyle = () => {
-    if (isLocked) return styles.levelLocked;
-    if (isCompleted) return styles.levelCompleted;
-    if (isCurrent) return styles.levelCurrent;
-    return styles.levelAvailable;
+  const getModeIcon = () => {
+    if (isLocked) return '🔒';
+    return mode === 'timed' ? '⏱️' : '❤️';
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.connector} />
-      
-      <TouchableOpacity
-        style={[styles.level, getStatusStyle()]}
-        onPress={onPress}
-        disabled={isLocked}
-        activeOpacity={0.8}
+    <TouchableOpacity
+      disabled={isLocked}
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={styles.container}
+    >
+      <LinearGradient
+        colors={getGradientColors()}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradient}
       >
-        {isLocked ? (
-          <Text style={styles.lockIcon}>🔒</Text>
-        ) : (
-          <>
+        <View style={styles.content}>
+          {/* Номер уровня */}
+          <View style={styles.header}>
             <Text style={styles.levelNumber}>{levelNumber}</Text>
             <Text style={styles.modeIcon}>{getModeIcon()}</Text>
-          </>
-        )}
-      </TouchableOpacity>
+          </View>
 
-      {!isLocked && (
-        <View style={styles.starsContainer}>
-          {Array.from({ length: maxStars }).map((_, index) => (
-            <Text key={index} style={styles.star}>
-              {index < stars ? '⭐' : '☆'}
-            </Text>
-          ))}
+          {/* Звезды */}
+          {!isLocked && (
+            <View style={styles.starsContainer}>
+              {[...Array(maxStars)].map((_, index) => (
+                <Text key={index} style={styles.star}>
+                  {index < stars ? '⭐' : '☆'}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {/* Статус */}
+          <Text style={styles.status}>
+            {isLocked ? 'Заблокировано' : isCompleted ? 'Завершено' : 'Начать'}
+          </Text>
         </View>
-      )}
-    </View>
+
+        {/* Pulse анимация для активного уровня */}
+        {!isLocked && !isCompleted && (
+          <View style={styles.pulseOuter}>
+            <View style={styles.pulseInner} />
+          </View>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    marginVertical: spacing.md,
+    width: 140,
+    height: 160,
+    marginBottom: 20,
+    marginHorizontal: 10,
   },
-  connector: {
-    width: 4,
-    height: 40,
-    backgroundColor: colors.primary.light,
-    position: 'absolute',
-    top: -40,
-    zIndex: -1,
-  },
-  level: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
+  gradient: {
+    flex: 1,
+    borderRadius: 20,
+    padding: 2,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
   },
-  levelAvailable: {
-    backgroundColor: colors.background.paper,
-    borderColor: colors.primary.light,
+  content: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  levelCurrent: {
-    backgroundColor: colors.accent.light,
-    borderColor: colors.accent.main,
-  },
-  levelCompleted: {
-    backgroundColor: colors.success.light,
-    borderColor: colors.success.main,
-  },
-  levelLocked: {
-    backgroundColor: colors.background.default,
-    borderColor: colors.text.disabled,
-    opacity: 0.6,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
   },
   levelNumber: {
-    fontFamily: typography.fontFamily.black,
-    fontSize: typography.fontSize.xxl,
-    color: colors.primary.main,
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.text.primary,
   },
   modeIcon: {
-    fontSize: typography.fontSize.md,
-    marginTop: -spacing.xs,
-  },
-  lockIcon: {
-    fontSize: typography.fontSize.xxl,
+    fontSize: 20,
   },
   starsContainer: {
     flexDirection: 'row',
-    marginTop: spacing.sm,
-    gap: spacing.xs,
+    gap: 4,
   },
   star: {
-    fontSize: typography.fontSize.md,
+    fontSize: 24,
+  },
+  status: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  pulseOuter: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.success.main,
+  },
+  pulseInner: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.success.main,
+    opacity: 0.6,
   },
 });

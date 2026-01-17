@@ -1,3 +1,4 @@
+// frontend/src/lib/reducers/gameReducer.ts
 export interface GameState {
   currentQuestionIndex: number;
   score: number;
@@ -5,16 +6,9 @@ export interface GameState {
   correctAnswers: number;
   wrongAnswers: number;
   combo: number;
-  gameStatus: 'playing' | 'paused' | 'completed' | 'failed';
+  gameStatus: 'playing' | 'paused' | 'ended';
+  answeredQuestions: Set<string>;
 }
-
-export type GameAction =
-  | { type: 'NEXT_QUESTION' }
-  | { type: 'ANSWER'; payload: { lexemeId: string; isCorrect: boolean } }
-  | { type: 'LOSE_LIFE' }
-  | { type: 'COMPLETE_GAME' }
-  | { type: 'FAIL_GAME' }
-  | { type: 'RESET' };
 
 export const initialGameState: GameState = {
   currentQuestionIndex: 0,
@@ -24,35 +18,75 @@ export const initialGameState: GameState = {
   wrongAnswers: 0,
   combo: 0,
   gameStatus: 'playing',
+  answeredQuestions: new Set(),
 };
 
-export function gameReducer(state: GameState, action: GameAction): GameState {
-  switch (action.type) {
-    case 'NEXT_QUESTION':
-      return { ...state, currentQuestionIndex: state.currentQuestionIndex + 1 };
+export type GameAction =
+  | { type: 'ANSWER'; payload: { lexemeId: string; isCorrect: boolean } }
+  | { type: 'NEXT_QUESTION' }
+  | { type: 'LOSE_LIFE' }
+  | { type: 'SET_LIVES'; payload: number }
+  | { type: 'PAUSE' }
+  | { type: 'RESUME' }
+  | { type: 'RESET' };
 
+export const gameReducer = (state: GameState, action: GameAction): GameState => {
+  switch (action.type) {
     case 'ANSWER':
+      const { lexemeId, isCorrect } = action.payload;
+      const newAnsweredQuestions = new Set(state.answeredQuestions);
+      newAnsweredQuestions.add(lexemeId);
+
+      if (isCorrect) {
+        const comboMultiplier = Math.floor(state.combo / 3) + 1;
+        const baseScore = 10;
+        const scoreToAdd = baseScore * comboMultiplier;
+
+        return {
+          ...state,
+          score: state.score + scoreToAdd,
+          correctAnswers: state.correctAnswers + 1,
+          combo: state.combo + 1,
+          answeredQuestions: newAnsweredQuestions,
+        };
+      } else {
+        return {
+          ...state,
+          wrongAnswers: state.wrongAnswers + 1,
+          combo: 0,
+          answeredQuestions: newAnsweredQuestions,
+        };
+      }
+
+    case 'NEXT_QUESTION':
       return {
         ...state,
-        score: action.payload.isCorrect ? state.score + 10 + (state.combo * 2) : state.score,
-        correctAnswers: action.payload.isCorrect ? state.correctAnswers + 1 : state.correctAnswers,
-        wrongAnswers: !action.payload.isCorrect ? state.wrongAnswers + 1 : state.wrongAnswers,
-        combo: action.payload.isCorrect ? state.combo + 1 : 0,
+        currentQuestionIndex: state.currentQuestionIndex + 1,
       };
 
     case 'LOSE_LIFE':
-      const newLives = state.lives - 1;
       return {
         ...state,
-        lives: newLives,
-        gameStatus: newLives === 0 ? 'failed' : state.gameStatus,
+        lives: Math.max(0, state.lives - 1),
       };
 
-    case 'COMPLETE_GAME':
-      return { ...state, gameStatus: 'completed' };
+    case 'SET_LIVES':
+      return {
+        ...state,
+        lives: action.payload,
+      };
 
-    case 'FAIL_GAME':
-      return { ...state, gameStatus: 'failed' };
+    case 'PAUSE':
+      return {
+        ...state,
+        gameStatus: 'paused',
+      };
+
+    case 'RESUME':
+      return {
+        ...state,
+        gameStatus: 'playing',
+      };
 
     case 'RESET':
       return initialGameState;
@@ -60,4 +94,4 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     default:
       return state;
   }
-}
+};

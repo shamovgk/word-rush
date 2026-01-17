@@ -32,13 +32,28 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor - Исправление 7A
 apiClient.interceptors.response.use(
   (response) => {
     console.log('Response from:', response.config.url, 'Status:', response.status);
     return response;
   },
   async (error) => {
+    // Исправление 7A: Обработка Network Error
+    if (!error.response) {
+      console.error('Network Error - проверьте подключение к серверу');
+      console.error('API URL:', API_URL);
+      console.error('Error details:', error.message);
+      
+      const networkError = new Error(
+        'Не удается подключиться к серверу. Проверьте:\n' +
+        '1. Запущен ли backend (npm run start:dev)\n' +
+        '2. Правильно ли настроен EXPO_PUBLIC_API_URL в .env\n' +
+        '3. Доступен ли сервер по адресу: ' + API_URL
+      );
+      return Promise.reject(networkError);
+    }
+    
     console.error('Response error:', error.response?.status, error.response?.data);
     
     const originalRequest = error.config;
@@ -53,11 +68,13 @@ apiClient.interceptors.response.use(
       const refreshToken = useAuthStore.getState().refreshToken;
       
       if (!refreshToken) {
+        console.log('No refresh token, logging out');
         useAuthStore.getState().logout();
         return Promise.reject(error);
       }
 
       try {
+        console.log('Attempting to refresh token');
         const response = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken,
         });
@@ -68,12 +85,20 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
+        console.error('Refresh token failed:', refreshError);
         useAuthStore.getState().logout();
         return Promise.reject(refreshError);
       }
     }
 
-    return Promise.reject(error);
+    // Форматируем ошибку для удобства
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error ||
+                        error.message ||
+                        'Произошла неизвестная ошибка';
+    
+    const formattedError = new Error(errorMessage);
+    return Promise.reject(formattedError);
   }
 );
 
